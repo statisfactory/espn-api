@@ -56,7 +56,7 @@ class EspnFantasyRequests(object):
 
             # If all endpoints failed, raise the corresponding error
             if not self.cookies or 'espn_s2' not in self.cookies or 'SWID' not in self.cookies:
-                raise ESPNAccessDenied("espn_s2 and swid are required for private leagues")
+                raise ESPNAccessDenied("espn_s2 and swid are required")
 
             raise ESPNAccessDenied(f"League {self.league_id} cannot be accessed with espn_s2={self.cookies.get('espn_s2')} and swid={self.cookies.get('SWID')}")
 
