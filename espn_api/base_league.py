@@ -30,6 +30,7 @@ class BaseLeague(ABC):
 
     def _fetch_league(self, SettingsClass = BaseSettings):
         data = self.espn_request.get_league()
+
         self.currentMatchupPeriod = data['status']['currentMatchupPeriod']
         self.scoringPeriodId = data['scoringPeriodId']
         self.firstScoringPeriod = data['status']['firstScoringPeriod']
@@ -48,6 +49,7 @@ class BaseLeague(ABC):
     def _fetch_draft(self):
         '''Creates list of Pick objects from the leagues draft'''
         data = self.espn_request.get_league_draft()
+
         # League has not drafted yet
         if not data.get('draftDetail', {}).get('drafted'):
             return
@@ -80,7 +82,7 @@ class BaseLeague(ABC):
 
         for team in teams:
             roster = team_roster[team['id']]
-            owners = [member for member in members if member.get('id') in team.get('owners', [])]
+            owners = [member for member in members if member.get('id') == (team.get('owners') or [''])[0]]
             self.teams.append(TeamClass(team, roster=roster, schedule=schedule, year=seasonId, owners=owners, pro_schedule=pro_schedule))
 
         # sort by team ID
@@ -112,7 +114,7 @@ class BaseLeague(ABC):
     def _get_all_pro_schedule(self):
         data = self.espn_request.get_pro_schedule()
 
-        pro_teams = data.get('settings', {}).get('proTeams', {})
+        pro_teams = data['settings']['proTeams']
         pro_team_schedule = {}
 
         for team in pro_teams:

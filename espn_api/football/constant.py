@@ -43,6 +43,18 @@ POSITION_MAP = {
     'HC': 19
 }
 
+ESPN_POSITION_MAP = {
+    1: "QB",
+    2: "RB",
+    3: "WR",
+    4: "TE",
+    5: "K",
+    7: "P",
+    9: "DT",
+    10: "DE",
+    11: "LB"
+}
+
 PRO_TEAM_MAP = {
     0 : 'None',
     1 : 'ATL',
@@ -504,20 +516,4 @@ SETTINGS_SCORING_FORMAT_MAP = {
     232: { 'abbr': 'FGAY25', 'label': 'Every 25 FG Attempt yards' },
     233: { 'abbr': 'FGAY50', 'label': 'Every 50 FG Attempt yards' },
     234: { 'abbr': 'FGAY100', 'label': 'Every 100 FG Attempt yards' }
-}
-
-TRANSACTION_TYPES = {
-    'DRAFT',
-    'TRADE_ACCEPT',
-    'WAIVER',
-    'TRADE_VETO',
-    'FUTURE_ROSTER',
-    'ROSTER',
-    'RETRO_ROSTER',
-    'TRADE_PROPOSAL',
-    'TRADE_UPHOLD',
-    'FREEAGENT',
-    'TRADE_DECLINE',
-    'WAIVER_ERROR',
-    'TRADE_ERROR'
 }

@@ -1,6 +1,6 @@
 import json
 import random
-from typing import Callable, Dict, List, Set, Tuple, Union
+from typing import Callable, Dict, List, Tuple, Union
 
 from ..base_league import BaseLeague
 from .team import Team
@@ -11,8 +11,7 @@ from .player import Player
 from .activity import Activity
 from .settings import Settings
 from .utils import power_points, two_step_dominance
-from .constant import POSITION_MAP, ACTIVITY_MAP, TRANSACTION_TYPES
-from .transaction import Transaction
+from .constant import POSITION_MAP, ACTIVITY_MAP
 from .helper import (
     sort_by_coin_flip,
     sort_by_division_record,
@@ -45,8 +44,7 @@ class League(BaseLeague):
 
     def _fetch_teams(self, data):
         '''Fetch teams in league'''
-        pro_schedule = self._get_all_pro_schedule()
-        super()._fetch_teams(data, TeamClass=Team, pro_schedule=pro_schedule)
+        super()._fetch_teams(data, TeamClass=Team)
 
         # replace opponentIds in schedule with team instances
         for team in self.teams:
@@ -91,7 +89,13 @@ class League(BaseLeague):
             self._fetch_players()
         if refresh__teams:
             self._fetch_teams(data)
-
+        return None
+            
+    def process_lineup_slot_counts(self):
+        lineup_slot_counts = self.settings.position_slot_counts
+        
+        return lineup_slot_counts
+    
     def load_roster_week(self, week: int) -> None:
         '''Sets Teams Roster for a Certain Week'''
         params = {
@@ -131,10 +135,6 @@ class League(BaseLeague):
         Returns:
             List[Dict]: Sorted standings list
         """
-        # Return empty standings if no matchup periods have completed yet
-        if self.currentMatchupPeriod <= 1:
-            return self.standings()
-
         # Get standings data for each team up to the given week
         list_of_team_data = []
         for team in self.teams:
@@ -178,18 +178,9 @@ class League(BaseLeague):
                 (sort_by_points_against, "points_against"),
                 (sort_by_coin_flip, "coin_flip"),
             ]
-        elif self.settings.playoff_seed_tie_rule == "INTRA_DIVISION_RECORD":
-            tiebreaker_hierarchy = [
-                (sort_by_division_record, "division_record"),
-                (sort_by_head_to_head, "h2h_wins"),
-                (sort_by_win_pct, "win_pct"),
-                (sort_by_points_for, "points_for"),
-                (sort_by_points_against, "points_against"),
-                (sort_by_coin_flip, "coin_flip"),
-            ]
         else:
             raise ValueError(
-                "Unkown tiebreaker_method: Must be either 'TOTAL_POINTS_SCORED', 'H2H_RECORD', or 'INTRA_DIVISION_RECORD'"
+                "Unkown tiebreaker_method: Must be either 'TOTAL_POINTS_SCORED' or 'H2H_RECORD'"
             )
 
         # First assign the division winners
@@ -238,7 +229,7 @@ class League(BaseLeague):
         for team in self.teams:
             top_week_points.append(max(team.scores[:self.current_week]))
         top_scored_tup = [(i, j) for (i, j) in zip(self.teams, top_week_points)]
-        top_tup = sorted(top_scored_tup, key=lambda tup: float(tup[1]), reverse=True)
+        top_tup = sorted(top_scored_tup, key=lambda tup: int(tup[1]), reverse=True)
         return top_tup[0]
 
     def least_scored_week(self) -> Tuple[Team, int]:
@@ -246,7 +237,7 @@ class League(BaseLeague):
         for team in self.teams:
             least_week_points.append(min(team.scores[:self.current_week]))
         least_scored_tup = [(i, j) for (i, j) in zip(self.teams, least_week_points)]
-        least_tup = sorted(least_scored_tup, key=lambda tup: float(tup[1]), reverse=False)
+        least_tup = sorted(least_scored_tup, key=lambda tup: int(tup[1]), reverse=False)
         return least_tup[0]
 
 
@@ -391,11 +382,11 @@ class League(BaseLeague):
             playerId = [playerId]
 
         data = self.espn_request.get_player_card(playerId, self.finalScoringPeriod)
-        pro_schedule = self._get_all_pro_schedule()
+
         if len(data['players']) == 1:
-            return Player(data['players'][0], self.year, pro_schedule)
+            return Player(data['players'][0], self.year)
         if len(data['players']) > 1:
-            return [Player(player, self.year, pro_schedule) for player in data['players']]
+            return [Player(player, self.year) for player in data['players']]
 
     def message_board(self, msg_types: List[str] = None):
         ''' Returns a list of league messages'''
@@ -408,26 +399,3 @@ class League(BaseLeague):
             for msg in msgs:
                 messages.append(msg)
         return messages
-
-    def transactions(self, scoring_period: int = None, types: Set[str] = {"FREEAGENT","WAIVER","WAIVER_ERROR"}) -> List[Transaction]:
-        '''Returns a list of recent transactions'''
-        if not scoring_period:
-            scoring_period = self.scoringPeriodId
-
-        if types > TRANSACTION_TYPES:
-            raise Exception('Invalid transaction type')
-
-        params = {
-            'view': 'mTransactions2',
-            'scoringPeriodId': scoring_period,
-        }
-
-        filters = {"transactions":{"filterType":{"value":list(types)}}}
-        headers = {'x-fantasy-filter': json.dumps(filters)}
-
-        data = self.espn_request.league_get(params=params, headers=headers)
-        if 'transactions' not in data:
-            raise Exception('No transactions found')
-        transactions = data['transactions']
-
-        return [Transaction(transaction, self.player_map, self.get_team_data) for transaction in transactions]

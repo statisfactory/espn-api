@@ -1,17 +1,16 @@
 import json
-from typing import List, Set, Union
+from typing import List, Tuple, Union
 
 from ..base_league import BaseLeague
 from .team import Team
 from .player import Player
 from .matchup import Matchup
 from .box_score import get_box_scoring_type_class, BoxScore
+from .constant import PRO_TEAM_MAP
 from .activity import Activity
-from .transaction import Transaction
-from .constant import POSITION_MAP, ACTIVITY_MAP, TRANSACTION_TYPES
+from .constant import POSITION_MAP, ACTIVITY_MAP
 
 class League(BaseLeague):
-    teams: List[Team]
     '''Creates a League instance for Public/Private ESPN league'''
     def __init__(self, league_id: int, year: int, espn_s2=None, swid=None, fetch_league=True, debug=False):
         super().__init__(league_id=league_id, year=year, sport='nba', espn_s2=espn_s2, swid=swid, debug=debug)
@@ -47,8 +46,8 @@ class League(BaseLeague):
 
     def _fetch_teams(self, data):
         '''Fetch teams in league'''
-        self.pro_schedule = self._get_all_pro_schedule()
-        super()._fetch_teams(data, TeamClass=Team, pro_schedule=self.pro_schedule)
+        pro_schedule = self._get_all_pro_schedule()
+        super()._fetch_teams(data, TeamClass=Team, pro_schedule=pro_schedule)
 
         # replace opponentIds in schedule with team instances
         for team in self.teams:
@@ -85,12 +84,12 @@ class League(BaseLeague):
 
         return matchups
 
-    def recent_activity(self, size: int = 25, msg_type: str = None, offset: int = 0, include_moved=False) -> List[Activity]:
+    def recent_activity(self, size: int = 25, msg_type: str = None, offset: int = 0) -> List[Activity]:
         '''Returns a list of recent league activities (Add, Drop, Trade)'''
         if self.year < 2019:
             raise Exception('Cant use recent activity before 2019')
 
-        msg_types = [178,180,179,239,181,244,188]
+        msg_types = [178,180,179,239,181,244]
         if msg_type in ACTIVITY_MAP:
             msg_types = [ACTIVITY_MAP[msg_type]]
         params = {
@@ -101,30 +100,9 @@ class League(BaseLeague):
         headers = {'x-fantasy-filter': json.dumps(filters)}
         data = self.espn_request.league_get(extend='/communication/', params=params, headers=headers)
         data = data['topics']
-        activity = [Activity(topic, self.player_map, self.get_team_data, include_moved=include_moved) for topic in data]
+        activity = [Activity(topic, self.player_map, self.get_team_data) for topic in data]
 
         return activity
-
-    def transactions(self, scoring_period: int = None, types: Set[str] = {"FREEAGENT","WAIVER","WAIVER_ERROR"}) -> List[Transaction]:
-        '''Returns a list of recent transactions'''
-        if not scoring_period:
-            scoring_period = self.scoringPeriodId
-
-        if types > TRANSACTION_TYPES:
-            raise Exception('Invalid transaction type')
-
-        params = {
-            'view': 'mTransactions2',
-            'scoringPeriodId': scoring_period,
-        }
-
-        filters = {"transactions":{"filterType":{"value":list(types)}}}
-        headers = {'x-fantasy-filter': json.dumps(filters)}
-
-        data = self.espn_request.league_get(params=params, headers=headers)
-        transactions = data['transactions']
-
-        return [Transaction(transaction, self.player_map, self.get_team_data) for transaction in transactions]
 
     def free_agents(self, week: int=None, size: int=50, position: str=None, position_id: int=None) -> List[Player]:
         '''Returns a List of Free Agents for a Given Week\n
@@ -184,7 +162,8 @@ class League(BaseLeague):
         data = self.espn_request.league_get(params=params, headers=headers)
 
         schedule = data['schedule']
-        box_data = [self.BoxScoreClass(matchup, self.pro_schedule, matchup_total, self.year, scoring_id) for matchup in schedule]
+        pro_schedule = self._get_all_pro_schedule()
+        box_data = [self.BoxScoreClass(matchup, pro_schedule, matchup_total, self.year, scoring_id) for matchup in schedule]
 
         for team in self.teams:
             for matchup in box_data:
@@ -194,7 +173,7 @@ class League(BaseLeague):
                     matchup.away_team = team
         return box_data
 
-    def player_info(self, name: str = None, playerId: Union[int, list] = None, include_news = False) -> Union[Player, List[Player]]:
+    def player_info(self, name: str = None, playerId: Union[int, list] = None) -> Union[Player, List[Player]]:
         ''' Returns Player class if name found '''
 
         if name:
@@ -206,12 +185,9 @@ class League(BaseLeague):
 
         data = self.espn_request.get_player_card(playerId, self.finalScoringPeriod)
 
-        if include_news:
-            news = {}
-            for id in playerId:
-                news[id] = self.espn_request.get_player_news(id)
+        pro_schedule = self._get_all_pro_schedule()
 
         if len(data['players']) == 1:
-            return Player(data['players'][0], self.year, self.pro_schedule, news=news.get(playerId[0], []) if include_news else None)
+            return Player(data['players'][0], self.year, pro_schedule)
         if len(data['players']) > 1:
-            return [Player(player, self.year, self.pro_schedule, news=news.get(player['id'], []) if include_news else None) for player in data['players']]
+            return [Player(player, self.year, pro_schedule) for player in data['players']]

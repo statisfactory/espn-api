@@ -5,7 +5,7 @@ from functools import cached_property
 
 class Player(object):
     '''Player are part of team'''
-    def __init__(self, data, year, pro_team_schedule = None, news = None):
+    def __init__(self, data, year, pro_team_schedule = None):
         self.name = json_parsing(data, 'fullName')
         self.playerId = json_parsing(data, 'id')
         self.year = year
@@ -18,9 +18,6 @@ class Player(object):
         self.posRank = json_parsing(data, 'positionalRanking')
         self.stats = {}
         self.schedule = {}
-        self.news = {}
-        expected_return_date = json_parsing(data, 'expectedReturnDate')
-        self.expected_return_date = datetime(*expected_return_date).date() if expected_return_date else None
 
         if pro_team_schedule:
             pro_team_id = json_parsing(data, 'proTeamId')
@@ -30,16 +27,7 @@ class Player(object):
                 team = game['awayProTeamId'] if game['awayProTeamId'] != pro_team_id else game['homeProTeamId']
                 self.schedule[key] = { 'team': PRO_TEAM_MAP[team], 'date': datetime.fromtimestamp(game['date']/1000.0) }
 
-        if news:
-            news_feed = news.get("news", {}).get("feed", [])
-            self.news = [
-                {
-                    "published": item.get("published", ""),
-                    "headline": item.get("headline", ""),
-                    "story": item.get("story", "")
-                }
-                for item in news_feed
-            ]
+
 
         # add available stats
 
@@ -54,7 +42,7 @@ class Player(object):
                 applied_avg =  round(split.get('appliedAverage', 0), 2)
                 game = self.schedule.get(id, {})
                 self.stats[id] = dict(applied_total=applied_total, applied_avg=applied_avg, team=game.get('team', None), date=game.get('date', None))
-                if split.get('stats'):
+                if split['stats']:
                     if 'averageStats' in split.keys():
                         self.stats[id]['avg'] = {STATS_MAP.get(i, i): split['averageStats'][i] for i in split['averageStats'].keys() if STATS_MAP.get(i) != ''}
                         self.stats[id]['total'] = {STATS_MAP.get(i, i): split['stats'][i] for i in split['stats'].keys() if STATS_MAP.get(i) != ''}

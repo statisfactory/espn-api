@@ -1,5 +1,4 @@
 from .player import Player
-from .constant import PLAYER_STATS_MAP
 
 class Team(object):
     '''Teams are part of the league'''
@@ -20,14 +19,12 @@ class Team(object):
         self.acquisition_budget_spent = data.get('transactionCounter', {}).get('acquisitionBudgetSpent', 0)
         self.drops = data.get('transactionCounter', {}).get('drops', 0)
         self.trades = data.get('transactionCounter', {}).get('trades', 0)
-        self.move_to_ir = data.get('transactionCounter', {}).get('moveToIR', 0)
         self.playoff_pct = data.get('currentSimulationResults', {}).get('playoffPct', 0) * 100
         self.draft_projected_rank = data.get('draftDayProjectedRank', 0)
         self.streak_length = data['record']['overall']['streakLength']
         self.streak_type = data['record']['overall']['streakType']
         self.standing = data['playoffSeed']
         self.final_standing = data['rankCalculatedFinal']
-        self.waiver_rank = data.get('waiverRank', 0)
         if 'logo' in data:    
             self.logo_url = data['logo']
         else:
@@ -38,20 +35,19 @@ class Team(object):
         self.outcomes = []
         self.mov = []
         self._fetch_schedule(schedule)
-        self._fetch_roster(roster, year, kwargs.get('pro_schedule'))
+        self._fetch_roster(roster, year)
         self.owners = kwargs.get('owners', [])
-        self.stats = {PLAYER_STATS_MAP.get(int(i), i): j for i, j in data.get('valuesByStat', {}).items()}
 
     def __repr__(self):
         return 'Team(%s)' % (self.team_name, )
     
-    def _fetch_roster(self, data, year, pro_schedule = None):
+    def _fetch_roster(self, data, year):
         '''Fetch teams roster'''
         self.roster.clear()
         roster = data.get('entries', [])
 
         for player in roster:
-            self.roster.append(Player(player, year, pro_schedule))
+            self.roster.append(Player(player, year))
 
     def _fetch_schedule(self, data):
         '''Fetch schedule and scores for team'''
@@ -76,8 +72,6 @@ class Team(object):
     def _get_winner(self, winner: str, is_away: bool) -> str:
         if winner == 'UNDECIDED':
             return 'U'
-        elif winner == 'TIE':
-            return 'T'
         elif (is_away and winner == 'AWAY') or (not is_away and winner == 'HOME'):
             return 'W'
         else:
